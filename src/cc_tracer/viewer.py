@@ -267,29 +267,37 @@ def cmd_tail(args):
                         r = json.loads(line)
                         event = r.get("event", "?")
                         color = EVENT_COLORS.get(event, "white")
-                        ts = r.get("ts", "")[11:19]
+                        ts = r.get("ts", "")
+                        time_str = ts[11:19] if len(ts) >= 19 else ts
 
                         out = Text()
-                        out.append(f"  {ts}  ", style="dim")
+                        out.append(f"  {time_str}  ", style="dim")
                         out.append(f"{event:<20}", style=color)
 
                         if event == "UserPromptSubmit":
                             prompt = r.get("prompt", "")
                             out.append(prompt[:80], style="white")
-                        elif event in ("PreToolUse", "PostToolUse"):
-                            tool = r.get("tool_name", "")
+                            if len(prompt) > 80:
+                                out.append("...", style="dim")
+                        elif event == "PreToolUse":
+                            tool = r.get("tool_name", "?")
                             out.append(tool, style="bold")
                             cmd = r.get("command")
                             if cmd:
                                 out.append(f"  $ {cmd[:60]}", style="dim")
-                            if event == "PostToolUse":
-                                out.append(f"  {r.get('response_size', 0)}B", style="dim")
+                        elif event == "PostToolUse":
+                            tool = r.get("tool_name", "?")
+                            out.append(tool, style="bold")
+                            out.append(f"  {r.get('response_size', 0)}B", style="dim")
                         elif event == "Stop":
                             llm = r.get("llm_response", "")
                             if llm:
-                                out.append(llm[:80].replace("\n", " "), style="white")
+                                preview = llm[:120].replace("\n", " ")
+                                out.append(preview, style="white")
+                                if len(llm) > 120:
+                                    out.append("...", style="dim")
                         elif event == "SessionStart":
-                            out.append(f"model={r.get('model', '?')}", style="dim")
+                            out.append(f"model={r.get('model', '?')}  source={r.get('source', '?')}", style="dim")
                         elif event == "SessionEnd":
                             out.append(f"reason={r.get('reason', '?')}", style="dim")
 
