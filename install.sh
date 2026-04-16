@@ -4,7 +4,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-VENV_DIR="/home/yiliu7/workspace/venvs/cct"
+VENV_DIR="${CC_TRACER_VENV:-$HOME/.cc-tracer/venv}"
 SETTINGS="$HOME/.claude/settings.json"
 TRACER_CMD="$VENV_DIR/bin/python $SCRIPT_DIR/src/cc_tracer/tracer.py"
 
