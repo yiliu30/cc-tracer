@@ -5,7 +5,7 @@ Usage:
     cc-trace list                     List all traced sessions
     cc-trace view [SESSION|latest]    Show formatted timeline
     cc-trace stats [SESSION|latest]   Show tool usage statistics
-    cc-trace tail                     Live-follow the latest session
+    cc-trace tail [SESSION]            Live-follow a session (default: latest)
 """
 
 import argparse
@@ -250,14 +250,15 @@ def cmd_stats(args):
     console.print()
 
 
-def cmd_tail(_args):
-    """Live-follow the latest session trace file."""
-    path = _resolve_session("latest")
+def cmd_tail(args):
+    """Live-follow a session trace file (like tail -f)."""
+    session = getattr(args, "session", None) or "latest"
+    path = _resolve_session(session)
     console.print(f"[dim]Tailing {path}  (Ctrl+C to stop)[/dim]\n")
 
     try:
         with open(path) as f:
-            # Go to end
+            # Go to end — only show new lines as they arrive
             f.seek(0, 2)
             while True:
                 line = f.readline()
@@ -266,13 +267,45 @@ def cmd_tail(_args):
                         r = json.loads(line)
                         event = r.get("event", "?")
                         color = EVENT_COLORS.get(event, "white")
-                        ts = r.get("ts", "")[11:19]
-                        tool = r.get("tool_name", "")
-                        console.print(f"  {ts}  [{color}]{event:<20}[/{color}]  {tool}")
+                        ts = r.get("ts", "")
+                        time_str = ts[11:19] if len(ts) >= 19 else ts
+
+                        out = Text()
+                        out.append(f"  {time_str}  ", style="dim")
+                        out.append(f"{event:<20}", style=color)
+
+                        if event == "UserPromptSubmit":
+                            prompt = r.get("prompt", "")
+                            out.append(prompt[:80], style="white")
+                            if len(prompt) > 80:
+                                out.append("...", style="dim")
+                        elif event == "PreToolUse":
+                            tool = r.get("tool_name", "?")
+                            out.append(tool, style="bold")
+                            cmd = r.get("command")
+                            if cmd:
+                                out.append(f"  $ {cmd[:60]}", style="dim")
+                        elif event == "PostToolUse":
+                            tool = r.get("tool_name", "?")
+                            out.append(tool, style="bold")
+                            out.append(f"  {r.get('response_size', 0)}B", style="dim")
+                        elif event == "Stop":
+                            llm = r.get("llm_response", "")
+                            if llm:
+                                preview = llm[:120].replace("\n", " ")
+                                out.append(preview, style="white")
+                                if len(llm) > 120:
+                                    out.append("...", style="dim")
+                        elif event == "SessionStart":
+                            out.append(f"model={r.get('model', '?')}  source={r.get('source', '?')}", style="dim")
+                        elif event == "SessionEnd":
+                            out.append(f"reason={r.get('reason', '?')}", style="dim")
+
+                        console.print(out)
                     except json.JSONDecodeError:
                         pass
                 else:
-                    time.sleep(0.5)
+                    time.sleep(0.3)
     except KeyboardInterrupt:
         console.print("\n[dim]Stopped.[/dim]")
 
@@ -289,7 +322,8 @@ def main():
     p_stats = sub.add_parser("stats", help="Show tool usage stats")
     p_stats.add_argument("session", nargs="?", default="latest")
 
-    sub.add_parser("tail", help="Live-follow latest session")
+    p_tail = sub.add_parser("tail", help="Live-follow a session (default: latest)")
+    p_tail.add_argument("session", nargs="?", default="latest")
 
     args = parser.parse_args()
 
