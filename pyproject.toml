@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cc-tracer"
+version = "0.1.0"
+description = "Claude Code session tracer — hooks-based observability for CC workflows"
+requires-python = ">=3.10"
+dependencies = ["rich>=13.0"]
+
+[project.scripts]
+cc-trace = "cc_tracer.viewer:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
