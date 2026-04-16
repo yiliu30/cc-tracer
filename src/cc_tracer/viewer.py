@@ -47,7 +47,9 @@ def _resolve_session(session: str | None) -> Path:
             console.print("[red]No trace files found.[/red]")
             sys.exit(1)
         return files[-1]
-    path = TRACE_DIR / f"{session}.jsonl"
+    # Strip .jsonl suffix if already present to avoid double extension
+    stem = session[:-6] if session.endswith(".jsonl") else session
+    path = TRACE_DIR / f"{stem}.jsonl"
     if not path.exists():
         console.print(f"[red]Trace file not found: {path}[/red]")
         sys.exit(1)
