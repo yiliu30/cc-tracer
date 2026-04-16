@@ -36,7 +36,13 @@ console = Console()
 
 
 def _resolve_session(session: str | None) -> Path:
-    """Resolve a session ID or 'latest' to a trace file path."""
+    """Resolve a session ID or 'latest' to a trace file path.
+
+    Accepts:
+    - None / 'latest'  → most recent session
+    - full session ID  → exact match
+    - short prefix     → e.g. 'ce7acd28' matches 'ce7acd28-...-....jsonl'
+    """
     if session is None or session == "latest":
         latest = TRACE_DIR / "latest"
         if latest.is_symlink():
@@ -47,13 +53,32 @@ def _resolve_session(session: str | None) -> Path:
             console.print("[red]No trace files found.[/red]")
             sys.exit(1)
         return files[-1]
+
     # Strip .jsonl suffix if already present to avoid double extension
     stem = session[:-6] if session.endswith(".jsonl") else session
+
+    # 1. Exact match
     path = TRACE_DIR / f"{stem}.jsonl"
-    if not path.exists():
-        console.print(f"[red]Trace file not found: {path}[/red]")
+    if path.exists():
+        return path
+
+    # 2. Prefix match — find all sessions whose ID starts with the given string
+    matches = sorted(
+        TRACE_DIR.glob(f"{stem}*.jsonl"),
+        key=lambda f: f.stat().st_mtime,
+        reverse=True,
+    )
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        console.print(f"[yellow]Ambiguous prefix '{stem}' matches {len(matches)} sessions:[/yellow]")
+        for m in matches:
+            console.print(f"  {m.stem}")
         sys.exit(1)
-    return path
+
+    console.print(f"[red]No session found matching '{stem}'[/red]")
+    sys.exit(1)
+
 
 
 def _load_records(path: Path) -> list[dict]:

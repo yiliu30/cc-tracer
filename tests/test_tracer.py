@@ -206,3 +206,49 @@ def test_subagent_context(trace_dir):
     r = _read_records(trace_dir, "s1")[0]
     assert r["agent_id"] == "ag1"
     assert r["agent_type"] == "Explore"
+
+
+# -- _resolve_session prefix matching --
+
+import pytest
+import cc_tracer.viewer as viewer_module
+from cc_tracer.viewer import _resolve_session
+
+
+@pytest.fixture
+def fake_trace_dir(tmp_path, monkeypatch):
+    td = tmp_path / "traces"
+    td.mkdir()
+    monkeypatch.setattr(viewer_module, "TRACE_DIR", td)
+    return td
+
+
+def test_resolve_exact(fake_trace_dir):
+    sid = "ce7acd28-0000-0000-0000-000000000000"
+    (fake_trace_dir / f"{sid}.jsonl").write_text("{}\n")
+    assert _resolve_session(sid).stem == sid
+
+
+def test_resolve_short_prefix(fake_trace_dir):
+    sid = "ce7acd28-0000-0000-0000-000000000000"
+    (fake_trace_dir / f"{sid}.jsonl").write_text("{}\n")
+    assert _resolve_session("ce7acd28").stem == sid
+
+
+def test_resolve_prefix_with_jsonl_suffix(fake_trace_dir):
+    sid = "ce7acd28-0000-0000-0000-000000000000"
+    (fake_trace_dir / f"{sid}.jsonl").write_text("{}\n")
+    # User pastes full filename with extension
+    assert _resolve_session(f"{sid}.jsonl").stem == sid
+
+
+def test_resolve_ambiguous_prefix_exits(fake_trace_dir):
+    (fake_trace_dir / "ce7acd28-aaaa.jsonl").write_text("{}\n")
+    (fake_trace_dir / "ce7acd28-bbbb.jsonl").write_text("{}\n")
+    with pytest.raises(SystemExit):
+        _resolve_session("ce7acd28")
+
+
+def test_resolve_no_match_exits(fake_trace_dir):
+    with pytest.raises(SystemExit):
+        _resolve_session("deadbeef")
